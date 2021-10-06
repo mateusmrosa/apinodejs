@@ -1,0 +1,16 @@
+{
+    "env": {
+        "MYSQL_USER": "",
+        "MYSQL_PASSWORD": "",
+        "MYSQL_DATABASE": "",
+        "MYSQL_HOST": "",
+        "MYSQL_PORT": 3306,
+        
+        "JWT_KEY": ")s@e%g&r$e!d)o*(&",
+        "JWT_KEY_MASTER": ")s@lkmcde%g&r$e!d)o*(&9",
+        "JWT_ATIVACONTA_KEY": "'%'4'75'4&$5UInuinui''N560",
+        "JWT_RESET_PASS": "_&*0&(015KQpY*$#!",
+        "BASE": "http://foodtok.com.br:3000",
+        "URLFOODTOK": "http://foodtok.com.br:3000"
+    }
+}

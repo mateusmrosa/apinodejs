@@ -1,0 +1,420 @@
+
+conexão com bando do gearhost:
+{
+    "env":{
+        "MYSQL_USER": "dbfoodtoknew",
+        "MYSQL_PASSWORD": "Md9rTc9YT_e?",
+        "MYSQL_DATABASE": "dbfoodtoknew",
+        "MYSQL_HOST": "127.0.0.1",
+        "MYSQL_PORT": 3306,
+
+        "JWT_KEY" : ")s@e%g&r$e!d)o*(&"
+
+    }
+}
+==================================================
+
+==========================
+banco e dados kamatera
+
+"MYSQL_USER": "db_foodtok",
+"MYSQL_PASSWORD": "JeZ73gBt",
+"MYSQL_DATABASE": "db_foodtok",
+"MYSQL_HOST": "104.128.65.62",
+"MYSQL_PORT": 3306,
+===========================
+
+
+
+    //json promocao
+    {
+        "usuid": 15,
+        "promonome": "Teste Promoção",
+        "promovalortotal": 59.90,
+        "promodescricao": "Teste Descrição",
+        "status": 1,
+        "combo": [
+            {
+                "prodid": 12,
+                "comqtde": 10
+            },
+            {
+                "prodid": 14,
+                "comqtde": 10
+            },
+            {
+                "prodid": 17,
+                "comqtde": 10
+            }
+        ]
+    }
+
+
+
+json para teste de cadastro:
+{
+	"usuemail": "talita@gmail.com",
+	"ususenha": "123",
+	"usutelefone": "0123456789",
+	"vennome": "vendedor1",
+	"lojnomeempresa": "Empresa Teste",
+	"lojcpf": "33431901875",
+	"lojcnpj": "57810931433",
+	"lojtelefone": "1832227226",
+	"endcep": "19020600",
+	"enduf": "SP",
+	"endcidade": "Presidente Prudente",
+	"endbairro": "Vila Machadinho",
+	"endrua": "Euclides da cunha",
+	"endnumero": "1009",
+	"endnome": "Casa"
+}
+
+
+{
+    "vennome": "mateus",
+    "usuemail": "mateus@tanca.com.br",
+    "usutelefone": "18981483133",
+    "usuid": 34
+}
+
+
+=====================================================
+
+hash para autenticação: 
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c3VpZCI6MTEsImlhdCI6MTYwNTYzNDg5OX0.Js0GWf-QoVSyAA2UKFApedQ74ojFLAMYteFvnJNMddI
+
+
+=====================================================================================================================
+
+router.post('/cadastro', (req, res, next) => {
+    mysql.getConnection((error, conn) => {
+        if (error) { return res.status(500).json({ error: error }) }
+        // conn.query(
+        //     'SELECT * FROM usuarios WHERE usuemail = ?', [req.body.usuemail], (error, results) => {
+        //         if (error) { return res.status(500).json({ error: error, }) }
+        //         if (results.length > 0) {
+        //             return res.status(401).json({ mensagem: "Usuário já cadastrado!" })
+        //         }
+        //         else {
+        bcrypt.hash(req.body.ususenha, 10, (errBcrypt, hash) => {
+            if (errBcrypt) { return res.status(500).json({ error: errBcrypt, }) }
+            conn.query(
+                `INSERT INTO usuarios (usuemail, usutelefone, ususenha) VALUES (?,?,?)`,
+                [req.body.usuemail, req.body.usutelefone, hash], (error, resultUsuario) => {
+                    if (error) { return res.status(500).json({ error: error, }) }
+                    var email = req.body.usuemail
+                    conn.query(
+                        'INSERT INTO vendedores (usuid, vennome) VALUES (?, ?)',
+                        [resultUsuario.insertId, req.body.vennome],
+                        (error, resultVendedor) => {
+                            if (error) { return res.status(500).json({ error: error, }) }
+                            conn.query(
+                                `INSERT INTO enderecos (usuid, endcep, enduf, endcidade, endbairro, endrua, endnumero, endnome, endcomplemento) 
+                                             VALUES (?,?,?,?,?,?,?,?,?)`,
+                                [
+                                    resultUsuario.insertId, req.body.endcep, req.body.enduf, req.body.endcidade,
+                                    req.body.endbairro, req.body.endrua, req.body.endnumero, req.body.endnome, req.body.endcomplemento
+                                ],
+                                (error, resultEndereco) => {
+                                    if (error) { return res.status(500).json({ error: error, }) }
+                                    conn.query(
+                                        `INSERT INTO lojas (venid, lojnomeempresa, lojcpf, lojcnpj, lojtelefone) 
+                                                    VALUES (?,?,?,?,?)`,
+                                        [
+                                            resultVendedor.insertId, req.body.lojnomeempresa,
+                                            req.body.lojcpf, req.body.lojcnpj, req.body.lojtelefone
+                                        ],
+                                        (error, resultLoja) => {
+                                            if (error) { return res.status(500).json({ error: error, }) }
+                                            const response = {
+                                                mensagem: "Cadastrado realizado com sucesso!",
+                                                idvendedor: resultVendedor.insertId,
+                                                idEndereco: resultEndereco.insertId,
+                                                idLoja: resultLoja.insertId
+                                            }
+                                            console.log(
+                                                `idusu:  ${resultUsuario.insertId}, idvend: ${resultVendedor.insertId}, idend:  ${resultEndereco.insertId}, idloja: ${resultLoja.insertId}`
+                                            )
+
+                                            mail.enviarEmailWelcome(req.body)
+
+                                            return res.status(201).json({ response })
+                                        })
+                                })
+                        })
+                })
+        })
+        // }
+        // })
+    })
+})
+=====================================================================================================================
+
+
+exports.cadastro = (req, res, next) => {
+    try {
+        mysql.getConnection((error, conn) => {
+            conn.query(
+                `SELECT * FROM produtos WHERE (prodnome = ?) AND (usuid = ?)`,
+                [req.body.prodnome, req.body.usuid],
+                (error, resultSelectProduto, filed) => {
+                    if (error) { return res.status(500).send({ error: error }) }
+
+                    if (req.file == undefined)
+                        return res.status(400).send({ msg: "Insira as imagens do produto" })
+
+                    // if (resultSelectProduto.length > 0) {
+                    //     return res.status(400).json({ msg: 'Esse produto já existe' })
+                    // }
+                    // else {
+                    conn.query(
+                        //buscar lojid na tabela lojas
+                        'SELECT lojid FROM lojas WHERE usuid = ?', [req.body.usuid],
+                        (error, resultSelectLoja, filed) => {
+                            if (error) { return res.status(500).send({ error: error }) }
+                            conn.query(
+                                `INSERT INTO produtos (usuid, lojid, catprodid, prodnome, proddescricao, prodvalor, proddisp)
+                                     VALUES (?,?,?,?,?,?,?)`,
+                                [
+                                    req.body.usuid, resultSelectLoja[0].lojid, req.body.catprodid,
+                                    req.body.prodnome, req.body.proddescricao, req.body.prodvalor, req.body.proddisp
+                                ],
+                                (error, resultProdutos, filed) => {
+                                    conn.release()
+                                    if (error) { return res.status(500).send({ error: error }) }
+
+                                    if (resultProdutos.affectedRows > 0) {
+                                        conn.query(
+                                            `INSERT INTO imagens_produtos (prodid, imgprocaminho) VALUES (?,?)`,
+                                            [resultProdutos.insertId, req.file.path],
+                                            (error, resultImg, filed) => {
+                                                if (error) { return res.status(500).send({ error: error }) }
+                                                const response = {
+                                                    mensagem: 'Produto inserido com sucesso!',
+                                                    produtoCriado: {
+                                                        imgid: resultImg.insertId,
+                                                        // imgCaminho: imagens.path,
+                                                        prodid: resultProdutos.insertId,
+                                                        usuid: req.body.usuid,
+                                                        lojid: resultSelectLoja[0].lojid,
+                                                        catprodid: req.body.catproid,
+                                                        proddisp: req.body.proddisp
+                                                    }
+                                                }
+                                                return res.status(201).send({ response })
+                                            }
+                                        )
+                                    } else {
+                                        console.log(resultProdutos.affectedRows)
+                                        const response = { msg: "Algo deu errado!" }
+                                        return res.status(400).send({ response })
+                                    }
+                                }
+                            )
+                        }
+                    )
+                    // }
+                }
+            )
+        })
+    } catch (e) {
+        console.log(e)
+        return res.status(400).json({ mensagem: "Algo deu errado!", Erro: e })
+    }
+}
+
+
+
+//json cadastro
+// {
+//     "usuemail": "mateustanca@gmail.com",
+//     "usutelefone": "18981483133",
+//     "ususenha": 123456,
+//     "vennome": "Mateus",
+//     "endcep": "19020600",
+//     "enduf": "SP",
+//     "endcidade": "Presidente Bernardes",
+//     "endbairro": "Vila Alfredo",
+//     "endrua": "Euclides da cunha",
+//     "endnumero": "1009",
+//     "endnome": "Teste",
+//     "endcomplemento": "Predio 2 andar",
+//     "lojnomeempresa": "gulo suras",
+//     "lojcpf":"33431901875",
+//     "lojcnpj": "",
+//     "lojtelefone": "32227226",
+//     "lojurl": "gulosuras"
+// }
+
+=========================
+async/await
+
+//recebe um token e uma nova senha se o token for válido redefini a senha...só funciona se o metodo esauecisenha gerar o token nates
+exports.resetsenha = async (req, res, next) => {
+    try {
+        const { token, novasenha } = req.body
+
+        if (token) {
+
+            jwt.verify(token, process.env.JWT_RESET_PASS, function (error, decodedToken) {
+                
+                if (error) {
+                    return res.status(401).json({ error: 'Token inválido ou expirado!' })
+                }
+
+                const resultSelect = await usuariosModels.obterToken(decodedToken.usuid)
+
+                if (resultSelect[0].usuresettoken == token) {
+
+                    bcrypt.hash(novasenha, 10, (errBcrypt, hash) => {
+
+                        if (errBcrypt) { return res.status(500).json({ error: errBcrypt, }) }
+
+                        const resultUpdate = await usuariosModels.resetUpdateSenha(hash, decodedToken.usuid)
+
+                        if (resultUpdate.affectedRows > 0) {
+                            return res.status(200).json({ mensagem: "Senha atualizada com retorno!" })
+                        }
+                        else {
+                            return res.status(500).json({ mensagem: "Erro ao atualizar senha!" })
+                        }
+                    })
+                }
+                else {
+                    return res.status(404).json({ mensagem: "Token incorreto!" })
+                }
+            })
+        }
+    } catch (e) {
+        console.log(e)
+        return res.status(400).json({ mensagem: "Algo deu errado!", Erro: e })
+    }
+}
+
+Models
+
+
+
+async function obterToken(isUsuario) {
+    try {
+        const select = `SELECT * FROM usuarios WHERE usuid = ?`
+        const result = await mysql.execute(select, [isUsuario]);
+        return result
+
+    } catch (e) {
+        console.log(e)
+        return { mensagem: "Algo deu errado!", Erro: e }
+    }
+}
+module.exports.obterToken = obterToken
+
+
+
+async function resetUpdateSenha(hash, idUsuario) {
+    try {
+        const select = `UPDATE usuarios SET ususenha = ? WHERE usuid = ?`
+        const result = await mysql.execute(select, [hash, idUsuario]);
+        return result
+
+    } catch (e) {
+        console.log(e)
+        return { mensagem: "Algo deu errado!", Erro: e }
+    }
+}
+module.exports.resetUpdateSenha = resetUpdateSenha
+
+
+
+=======================
+
+
+ json pedidos novo
+{
+    "lojurl": "cardapiodemo",
+    "ped_forma_pgto": "Dinheiro",
+    "ped_nome_cliente": "Talita Sanchez",
+    "ped_end_logradouro": "Rua Lorem Ipsum",
+    "ped_end_num": 123,
+    "ped_end_bairro": "Cardápio Digital",
+    "ped_end_cidade": "Online",
+    "ped_telefone": "13212313232",
+    "ped_pdf": [
+        "'================================'",
+        "'NOME:  Mateus\n'",
+        "'TELEFONE: (18)981483133\n'",
+        "'ENDEREÇO: Rua Coriolano Gomes Palmeira\n'",
+        "'NUM: 1009\n'",
+        "'BAIRRO: Vila Machadinho\n'",
+        "'CIDADE: Presidente Prudente\n'",
+        "'================================'",
+        "'PRODUTOS: '",
+        "'1 - Ostenta No Choco\n'",
+        "'Obs. Refrigerante Quente'",
+        "'2 - Churrasco + Fruta do dia\n'",
+        "'Obs. Fruta madura'",
+        "'1 - X-Burguer + Mussarela + Cebola\n'",
+        "'Obs. Sem Alface'",
+        "'================================'",
+        "'TOTAL: R$ 0,00\n'",
+        "'PAGAMENTO: Dinheiro\n'",
+        "'Obs: Troco para 100,00\n'",
+        "'================================'"
+    ],
+    "itens": [
+        {
+            "prodid": null,
+            "promoid": 212,
+            "ite_qtde": 1,
+            "ite_valor_total": 20
+        },
+        {
+            "prodid": 309,
+            "promoid": null,
+            "ite_qtde": 2,
+            "ite_valor_total": 32
+        },
+        {
+            "prodid": 243,
+            "promoid": null,
+            "ite_qtde": 1,
+            "ite_valor_total": 18
+        }
+    ]
+}
+
+=======================
+
+//const http = require('http')
+
+//server.listen(port)
+
+//console.log(`api rodando na porta ${port}`)
+
+//const { logger } = require('./logger')
+
+const app = require('./app')
+
+const port = process.env.PORT || 3000
+
+const fs = require('fs')
+
+const http = require('http')
+
+const server = http.createServer(app)
+
+// const options = {
+//     key: fs.readFileSync('./key.pem'),
+//     cert: fs.readFileSync('./cert.pem')
+// };
+
+// const server = http.createServer(options, app, function (res) {
+//     res.writeHead(200)
+// })
+
+server.listen(port, () => {
+    
+    console.log(`api rodando na porta ${port}`)
+})
+
+===========================================================
